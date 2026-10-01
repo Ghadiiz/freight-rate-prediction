@@ -21,14 +21,26 @@ def remove_price_outliers(df):
     ratio = df["posted_rate"] / (df["distance"] * df["quote_signal"])
     return df[(ratio >= 0.5) & (ratio <= 3)]
 
+# Columns the model will use, all available in train, validation AND December
+CATEGORICAL = ["pickup", "delivery", "equipment"]
+NUMERIC = ["distance", "weight", "day_of_week", "day_of_month", "month"]
+FEATURES = CATEGORICAL + NUMERIC
+TARGET = "posted_rate"
+
+
+def add_features(df):
+    """Turn the date into numbers the model can learn patterns from."""
+    df = df.copy()
+    df["day_of_week"] = df["date"].dt.dayofweek   # 0 = Monday ... 6 = Sunday
+    df["day_of_month"] = df["date"].dt.day        # 1 ... 31
+    df["month"] = df["date"].dt.month             # 1 ... 12
+    return df
+
 
 if __name__ == "__main__":
-    raw = pd.read_csv(DATA / "train_test.csv")
-    data = clean(raw)
-    filtered = remove_price_outliers(data)
+    data = add_features(clean(pd.read_csv(DATA / "train_test.csv")))
 
-    print("Negative weights before:", (raw["weight"] < 0).sum())
-    print("Negative weights after: ", (data["weight"] < 0).sum())
-    print("Date type:", data["date"].dtype)
-    print(f"Rows before outlier filter: {len(data):,}")
-    print(f"Rows after outlier filter:  {len(filtered):,} (removed {len(data) - len(filtered)})")
+    print(data[["date"] + FEATURES + [TARGET]].head())
+    print()
+    print("Missing values in model columns:")
+    print(data[FEATURES].isna().sum())

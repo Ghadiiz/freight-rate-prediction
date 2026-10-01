@@ -93,6 +93,24 @@ def report(name, actual, predicted):
     mape = mean_absolute_percentage_error(actual, predicted)
     print(f"{name:<10} MAE: ${mae:,.2f}   MAPE: {mape:.2%}")
 
+def predict_files(model, categories):
+    """Fill the validation template and the December chart inputs."""
+    # 12,000 validation loads
+    val = add_features(clean(pd.read_csv(DATA / "validation.csv")))
+    template = pd.read_csv(DATA / "validation_predictions_template.csv")
+    rates = pd.Series(predict(model, categories, val), index=val["load_id"])
+    template["predicted_rate"] = template["load_id"].map(rates).round(2)
+    template.to_csv(ROOT / "validation_predictions.csv", index=False)
+
+    # 31 December rows: keep the original columns and order, only fill predicted_rate
+    dec_raw = pd.read_csv(DATA / "december_chart_inputs.csv")
+    dec = add_features(clean(dec_raw))
+    dec_raw["predicted_rate"] = predict(model, categories, dec).round(2)
+    dec_raw.to_csv(DATA / "december_chart_inputs.csv", index=False)
+
+    print(f"Saved validation_predictions.csv ({len(template):,} rows)")
+    print("Saved data/december_chart_inputs.csv (31 rows)")
+
 
 if __name__ == "__main__":
     data = add_features(clean(pd.read_csv(DATA / "train_test.csv")))
@@ -103,3 +121,6 @@ if __name__ == "__main__":
 
     model, categories = fit(train)
     report("Model", test[TARGET], predict(model, categories, test))
+        # Final model: retrain on ALL labeled data (Jan-Oct), outliers removed
+    final_model, final_categories = fit(remove_price_outliers(data))
+    predict_files(final_model, final_categories)
